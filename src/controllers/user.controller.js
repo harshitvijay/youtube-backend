@@ -152,7 +152,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: { refreshToken: undefined },
+      $unset: { refreshToken: 1 },
     },
     {
       new: true,
@@ -326,8 +326,6 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.params;
-  console.log(req.params);
-  console.log("username", username);
 
   if (!username?.trim()) {
     throw new ApiError(400, "Username is missing");
@@ -401,6 +399,125 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     );
 });
 
+// const getWatchHistory = asyncHandler(async (req, res) => {
+//   console.log("req.user", req.user);
+//   const user = await User.aggregate([
+//     {
+//       $match: {
+//         _id: req.user._id,
+//       },
+//     },
+//     {
+//       $lookup: {
+//         from: "videos",
+//         localField: "watchHistory",
+//         foreignField: "_id",
+//         as: "watchHistory",
+//         pipeline: [
+//           {
+//             $lookup: "users",
+//             localField: "owner",
+//             foreignField: "_id",
+//             as: "owner",
+//             pipeline: [
+//               {
+//                 $project: {
+//                   fullName: 1,
+//                   username: 1,
+//                   avatar: 1,
+//                   coverImage: 1,
+//                   email: 1,
+//                 },
+//               },
+//             ],
+//           },
+//           {
+//             $addFields: {
+//               owner: {
+//                 $first: "$owner",
+//               },
+//             },
+//           },
+//         ],
+//       },
+//     },
+//   ]);
+
+//   return res
+//     .status(200)
+//     .json(
+//       new ApiResponse(
+//         200,
+//         { user: user[0] },
+//         "Watch history fetched successfully!"
+//       )
+//     );
+// });
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: req.user._id,
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+          {
+            $project: {
+              "owner.fullName": 1,
+              "owner.username": 1,
+              "owner.avatar": 1,
+              "owner.coverImage": 1,
+              "owner.email": 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+        watchHistory: 1,
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: user[0] },
+        "Watch history fetched successfully!"
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -412,4 +529,5 @@ export {
   updateUserAvatar,
   updateUserCoverImage,
   getUserChannelProfile,
+  getWatchHistory,
 };
